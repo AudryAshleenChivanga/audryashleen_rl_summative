@@ -1,0 +1,19 @@
+<robot name="tract_segment">
+  <link name="segment">
+    <visual>
+      <geometry>
+        <cylinder length="1.0" radius="0.3"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <material name="gut_material">
+        <texture filename="/assets/tract_texture.jpg "/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="1.0" radius="0.3"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+    </collision>
+  </link>
+</robot>
