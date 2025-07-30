@@ -1,4 +1,3 @@
-# contrib/reinforce/reinforce.py
 import numpy as np
 import torch
 from torch.nn import functional as F
@@ -7,15 +6,10 @@ from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.utils import obs_as_tensor
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.type_aliases import GymStepReturn
-from stable_baselines3.common.logger import Logger
 from stable_baselines3.common.base_class import BaseAlgorithm
 
 
 class REINFORCE(BaseAlgorithm):
-    """
-    Simplified REINFORCE policy gradient method.
-    """
-
     def __init__(
         self,
         policy: str,
@@ -23,6 +17,7 @@ class REINFORCE(BaseAlgorithm):
         learning_rate: float = 1e-3,
         gamma: float = 0.99,
         verbose: int = 0,
+        _init_setup_model=True,
         **kwargs,
     ):
         super().__init__(
@@ -31,6 +26,7 @@ class REINFORCE(BaseAlgorithm):
             learning_rate=learning_rate,
             verbose=verbose,
             supported_action_spaces=(gym.spaces.Discrete,),
+            _init_setup_model=_init_setup_model,
             **kwargs,
         )
         self.gamma = gamma
@@ -63,7 +59,6 @@ class REINFORCE(BaseAlgorithm):
             if done.any():
                 break
 
-        # Compute discounted returns
         returns = []
         G = 0
         for r in reversed(rewards):
@@ -79,11 +74,14 @@ class REINFORCE(BaseAlgorithm):
         self.policy.optimizer.step()
 
         self._update_learning_rate([self.policy.optimizer])
+        self.logger.record("train/learning_rate", self.learning_rate)
+        self.logger.record("train/loss", loss.item())
 
     def learn(self, total_timesteps: int, callback=None, log_interval=1, tb_log_name="REINFORCE", reset_num_timesteps=True, progress_bar=False):
         self._setup_model()
-        self.n_steps = 2048  # You can tweak this
+        self.n_steps = 2048
         timesteps = 0
+        self._logger = self.logger
         while timesteps < total_timesteps:
             self._train(timesteps, callback, log_interval, tb_log_name, reset_num_timesteps, progress_bar)
             timesteps += self.n_steps
