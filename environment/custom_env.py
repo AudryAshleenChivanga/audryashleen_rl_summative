@@ -1,4 +1,5 @@
 # environment/custom_env.py
+
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
@@ -9,7 +10,7 @@ WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 400
 AGENT_SIZE = 30
 TARGET_SIZE = 30
-AGENT_SPEED = 15  # Increased for faster exploration
+AGENT_SPEED = 15
 
 class GI2DEnv(gym.Env):
     metadata = {"render_modes": ["human"]}
@@ -21,13 +22,18 @@ class GI2DEnv(gym.Env):
         self.window = None
         self.clock = None
 
-        self.action_space = spaces.Discrete(5)  # up, down, left, right, biopsy
+        self.action_space = spaces.Discrete(5)
         self.observation_space = spaces.Box(low=0, high=WINDOW_WIDTH, shape=(4,), dtype=np.float32)
 
         self.agent_pos = np.array([100, 100], dtype=np.float32)
         self.target_positions = []
         self.visited_targets = set()
         self.prev_distance = None
+        self.total_reward = 0
+        self.steps = 0
+        self.episode = 1
+        self.status = ""
+
         self._load_assets()
 
     def _load_assets(self):
@@ -39,12 +45,20 @@ class GI2DEnv(gym.Env):
         self.bg_img = pygame.image.load(os.path.join(self.asset_dir, "tract_texture.png"))
         self.bg_img = pygame.transform.scale(self.bg_img, (WINDOW_WIDTH, WINDOW_HEIGHT))
 
+        self.doctor_happy = pygame.image.load(os.path.join(self.asset_dir, "doctor_happy.png"))
+        self.doctor_sad = pygame.image.load(os.path.join(self.asset_dir, "doctor_sad.png"))
+        self.doctor_neutral = pygame.image.load(os.path.join(self.asset_dir, "doctor_neutral.png"))
+        self.doctor_happy = pygame.transform.scale(self.doctor_happy, (100, 100))
+        self.doctor_sad = pygame.transform.scale(self.doctor_sad, (100, 100))
+        self.doctor_neutral = pygame.transform.scale(self.doctor_neutral, (100, 100))
+
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.agent_pos = np.array([100, 100], dtype=np.float32)
         self.visited_targets = set()
         self.total_reward = 0
         self.steps = 0
+        self.status = "Searching for infection..."
 
         self.target_positions = [
             np.array([
@@ -66,10 +80,10 @@ class GI2DEnv(gym.Env):
 
     def step(self, action):
         dx, dy = 0, 0
-        if action == 0: dy = -AGENT_SPEED  # up
-        elif action == 1: dy = AGENT_SPEED  # down
-        elif action == 2: dx = -AGENT_SPEED  # left
-        elif action == 3: dx = AGENT_SPEED  # right
+        if action == 0: dy = -AGENT_SPEED
+        elif action == 1: dy = AGENT_SPEED
+        elif action == 2: dx = -AGENT_SPEED
+        elif action == 3: dx = AGENT_SPEED
 
         new_pos = self.agent_pos + np.array([dx, dy], dtype=np.float32)
         if 0 <= new_pos[0] <= WINDOW_WIDTH - AGENT_SIZE and 0 <= new_pos[1] <= WINDOW_HEIGHT - AGENT_SIZE:
@@ -78,21 +92,23 @@ class GI2DEnv(gym.Env):
         reward = 0.0
         done = False
         current_distance = self._distance(self.agent_pos, self.target_positions[0])
-        reward += (self.prev_distance - current_distance) * 0.1  # Reward for getting closer
+        reward += (self.prev_distance - current_distance) * 0.1
         self.prev_distance = current_distance
 
-        if action == 4:  # biopsy
+        if action == 4:
             if self._is_near(self.agent_pos, self.target_positions[0]):
                 reward += 20.0
                 self.visited_targets.add(0)
                 done = True
+                self.status = "Infection found!"
 
         self.total_reward += reward
         self.steps += 1
 
         if self.steps >= 300:
             if 0 not in self.visited_targets:
-                reward -= 10.0  # penalty for not finding infection
+                reward -= 10.0
+                self.status = "No infection found."
             done = True
 
         if self.render_mode:
@@ -108,19 +124,66 @@ class GI2DEnv(gym.Env):
 
     def _init_pygame(self):
         pygame.init()
-        self.window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-        pygame.display.set_caption("GI Capsule Navigation - 2D Free")
+        self.window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT + 100))
+        pygame.display.set_caption("GI Capsule Simulation - Infection Detection")
         self.clock = pygame.time.Clock()
+        self.font = pygame.font.SysFont("Arial", 24)
 
     def _render_frame(self):
+        self.window.fill((255, 255, 255))
         self.window.blit(self.bg_img, (0, 0))
+
         for i, pos in enumerate(self.target_positions):
             if i not in self.visited_targets:
                 self.window.blit(self.target_img, (int(pos[0]), int(pos[1])))
+
         self.window.blit(self.agent_img, (int(self.agent_pos[0]), int(self.agent_pos[1])))
+
+        # UI Panel
+        pygame.draw.rect(self.window, (240, 240, 240), (0, WINDOW_HEIGHT, WINDOW_WIDTH, 100))
+        reward_text = self.font.render(f"Reward: {self.total_reward:.2f}", True, (0, 0, 0))
+        step_text = self.font.render(f"Steps: {self.steps}", True, (0, 0, 0))
+        episode_text = self.font.render(f"Episode: {self.episode}", True, (0, 0, 0))
+        status_text = self.font.render(self.status, True, (80, 0, 0))
+
+        self.window.blit(reward_text, (10, WINDOW_HEIGHT + 10))
+        self.window.blit(step_text, (10, WINDOW_HEIGHT + 35))
+        self.window.blit(episode_text, (10, WINDOW_HEIGHT + 60))
+        self.window.blit(status_text, (300, WINDOW_HEIGHT + 10))
+
+        # Doctor face based on current status
+        if "Infection found" in self.status:
+            avatar = self.doctor_happy
+        elif "No infection" in self.status:
+            avatar = self.doctor_sad
+        else:
+            avatar = self.doctor_neutral
+
+        self.window.blit(avatar, (WINDOW_WIDTH - 120, WINDOW_HEIGHT + 0))
         pygame.display.flip()
         self.clock.tick(30)
 
+    def _render_summary(self):
+        self.window.fill((255, 255, 255))  # White background
+        title = self.font.render("EPISODE COMPLETE", True, (0, 0, 0))
+        result = self.font.render(self.status, True, (0, 100, 0) if "found" in self.status.lower() else (180, 0, 0))
+        reward_text = self.font.render(f"Total Reward: {self.total_reward:.2f}", True, (0, 0, 0))
+
+        if "Infection found" in self.status:
+            avatar = self.doctor_happy
+        elif "No infection" in self.status:
+            avatar = self.doctor_sad
+        else:
+            avatar = self.doctor_neutral
+
+        self.window.blit(title, ((WINDOW_WIDTH - title.get_width()) // 2, 50))
+        self.window.blit(result, ((WINDOW_WIDTH - result.get_width()) // 2, 100))
+        self.window.blit(reward_text, ((WINDOW_WIDTH - reward_text.get_width()) // 2, 150))
+        self.window.blit(avatar, ((WINDOW_WIDTH - avatar.get_width()) // 2, 220))
+        pygame.display.flip()
+
     def close(self):
-        if self.window:
+        if self.render_mode and self.window:
+            self._render_summary()
+            pygame.time.wait(3000)
             pygame.quit()
