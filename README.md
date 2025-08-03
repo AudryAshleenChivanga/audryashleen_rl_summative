@@ -128,7 +128,7 @@ This project was completed as part of ALU's **Machine Learning Techniques II** c
 
 ##  Acknowledgments
 
-Thanks to the ALU instructors and peers for support and feedback throughout this project.
+Thanks to the ALU instructors for teaching this module well , l learned a lot !!!
 
 ---
 ##  Author
