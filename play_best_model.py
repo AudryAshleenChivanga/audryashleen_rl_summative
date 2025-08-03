@@ -1,4 +1,4 @@
-# test_model.py
+# play_best_model.py
 from stable_baselines3 import PPO
 from environment.custom_env import GI2DEnv
 
