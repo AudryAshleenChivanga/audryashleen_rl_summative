@@ -14,16 +14,17 @@ check_env(env)
 model = DQN(
     "MlpPolicy",
     env,
-    learning_rate=1e-3,
-    buffer_size=50000,
-    learning_starts=1000,
-    batch_size=32,
-    gamma=0.99,
-    train_freq=4,
-    target_update_interval=250,
+    learning_rate=1e-3,             # Faster learning yielded quicker convergence
+    buffer_size=50000,              # Larger buffer helped experience diversity
+    learning_starts=1000,           # Initial delay before learning improved early performance
+    batch_size=32,                  # Balanced learning stability and speed
+    gamma=0.99,                     # Future reward weighting worked well for long-term infection detection
+    train_freq=4,                   # Regular updates kept training efficient
+    target_update_interval=250,     # Stabilized learning with frequent target updates
     verbose=1,
     tensorboard_log="logs/dqn/"
 )
+
 
 model.learn(total_timesteps=100_000)
 

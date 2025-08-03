@@ -1,45 +1,36 @@
 import os
 import sys
+import torch
 import numpy as np
 
+from stable_baselines3.common.policies import ActorCriticPolicy
+
+# Add root to path
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(ROOT)
 
-from contrib.reinforce.reinforce import REINFORCE
 from environment.custom_env import GI2DEnv
-from training.curriculum.curriculum_manager import CurriculumManager
+from contrib.reinforce.reinforce import REINFORCE
 
-log_dir = "logs/reinforce_improved/"
-model_dir = "models/reinforce/"
-os.makedirs(log_dir, exist_ok=True)
-os.makedirs(model_dir, exist_ok=True)
-
+# Initialize environment
 env = GI2DEnv(render_mode=False)
-curriculum = CurriculumManager()
-agent = REINFORCE(env=env, policy='mlp')
 
-n_episodes = 5000
-for episode in range(n_episodes):
-    obs = env.reset()[0]
-    done = False
-    log_probs = []
-    rewards = []
+# Set up agent with ActorCriticPolicy instead of "mlp"
+agent = REINFORCE(
+    env=env,
+    policy=ActorCriticPolicy,
+    learning_rate=1e-3,
+    gamma=0.99,
+    verbose=1,
+)
 
-    while not done:
-        action, log_prob = agent.select_action(obs)
-        obs, reward, done, _, _ = env.step(action)
-        log_probs.append(log_prob)
-        rewards.append(reward)
+# Train
+total_timesteps = 500_000
+agent.learn(total_timesteps=total_timesteps)
 
-    agent.update_policy(log_probs, rewards)
+# Save
+os.makedirs("models/reinforce", exist_ok=True)
+model_path = "models/reinforce/reinforce_gi2d_improved.pth"
+torch.save(agent.policy.state_dict(), model_path)
 
-    total_reward = sum(rewards)
-    curriculum.record_reward(total_reward)
-    if curriculum.ready_to_advance():
-        curriculum.advance_if_ready()
-
-    if (episode + 1) % 100 == 0:
-        print(f"Episode {episode + 1} — Total Reward: {total_reward:.2f}")
-
-agent.save(os.path.join(model_dir, "reinforce_gi2d_improved.pth"))
-print("REINFORCE Improved Training Complete.")
+print(f"REINFORCE model saved to {model_path}")
